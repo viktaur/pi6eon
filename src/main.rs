@@ -36,6 +36,19 @@ enum Action {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
+    print!(
+    r#"
+     ____  _  __
+    |  _ \(_)/ /_   ___  ___  _ __
+    | |_) | | '_ \ / _ \/ _ \| '_ \
+    |  __/| | (_) |  __/ (_) | | | |
+    |_|   |_|\___/ \___|\___/|_| |_|
+    "#
+    );
+    println!("\n\rWelcome to Pi6eon, the direct and end-to-end encrypted CLI chat over IPv6.");
+    println!("Type 'pi6eon --help' to learn how to use it.");
+    println!("");
+
     match args.command {
         Action::Setup { address, port } => {
             setup_connection(address, port).await?
@@ -44,8 +57,6 @@ async fn main() -> Result<()> {
             listen_for_connection(port).await?
         },
     };
-
-    println!("Action is {:?}", args.command);
 
     Ok(())
 }

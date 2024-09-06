@@ -14,6 +14,7 @@ pub async fn setup_connection(address: Ipv6Addr, port: u16) -> Result<()> {
 /// Listen for incoming connections on the provided port.
 pub async fn listen_for_connection(port: u16) -> Result<()> {
     let listener = TcpListener::bind((Ipv6Addr::LOCALHOST, port)).await?;
+    println!("TCP Listener created on port {port}");
 
     // We'll only accept one connection at a time.
     while let Ok((stream, socket_addr)) = listener.accept().await {
