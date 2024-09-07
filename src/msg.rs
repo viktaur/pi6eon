@@ -1,28 +1,41 @@
 use std::io::Write;
-
-use tokio::net::TcpStream;
+use aes_gcm::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    Aes256Gcm, Nonce, Key // Or `Aes128Gcm`
+};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::io::{self, BufReader, AsyncBufReadExt, AsyncWriteExt};
 use anyhow::Result;
+use x25519_dalek::SharedSecret;
 
 /// Starts two asynchronous tasks which read from and write to a stream.
-pub async fn messaging_loop(stream: TcpStream) -> Result<()> {
-    let (reader, mut writer) = stream.into_split();
-    let mut stream_reader = BufReader::new(reader);
-
+pub async fn messaging_loop(
+    mut stream_reader: BufReader<OwnedReadHalf>,
+    mut writer: OwnedWriteHalf,
+    secret: SharedSecret
+) -> Result<()> {
     let stdin = io::stdin();
     let mut stdin_reader = BufReader::new(stdin);
+
+    let key = Key::<Aes256Gcm>::from_slice(secret.as_bytes());
+    let cipher = Aes256Gcm::new(&key);
 
     let read_task = async {
         let mut buf = String::new();
         loop {
             buf.clear();
+
             match stream_reader.read_line(&mut buf).await {
                 Ok(0) => {
                     println!("Connection closed.");
                     break;
                 },
                 Ok(_) => {
-                    print!("\rFriend: {}", buf);
+                    let ciphertext = &buf[12..];
+                    let plaintext = std::str::from_utf8(
+                        cipher.decrypt(nonce, ciphertext)?
+                    );
+                    print!("\rFriend: {}", plaintext);
                     print!("\rYou: ");
                     std::io::stdout().flush()?;
                 },
@@ -39,6 +52,9 @@ pub async fn messaging_loop(stream: TcpStream) -> Result<()> {
     let write_task = async {
         let mut input = String::new();
         loop {
+            let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits; unique per message
+            let ciphertext = cipher.encrypt(&nonce, b"plaintext message".as_ref())?;
+
             print!("\rYou: ");
             std::io::stdout().flush()?;
 
@@ -47,6 +63,7 @@ pub async fn messaging_loop(stream: TcpStream) -> Result<()> {
 
             if input.trim() == "quit" { break }
 
+            let encrypted_input =
             writer.write_all(input.as_bytes()).await?;
             writer.flush().await?;
         }

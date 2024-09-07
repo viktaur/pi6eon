@@ -2,9 +2,9 @@ use std::net::Ipv6Addr;
 use clap::Parser;
 use clap::Subcommand;
 use anyhow::Result;
-use crate::tcp::*;
+use crate::conn::*;
 
-mod tcp;
+mod conn;
 mod msg;
 
 #[derive(Parser, Debug)]
