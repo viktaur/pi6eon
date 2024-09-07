@@ -1,9 +1,10 @@
 use anyhow::{anyhow, Result};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use std::net::Ipv6Addr;
 use crate::msg::messaging_loop;
-use x25519_dalek::{EphemeralSecret, PublicKey};
+use x25519_dalek::{EphemeralSecret, PublicKey, SharedSecret};
 
 /// Start a new TCP connection with the destination, perform Diffie-Hellman, start
 /// messaging.
@@ -16,34 +17,8 @@ pub async fn setup_connection(address: Ipv6Addr, port: u16) -> Result<()> {
     let (reader, mut writer) = stream.into_split();
     let mut stream_reader = BufReader::new(reader);
 
-    // Generate keys for Alice
-    let alice_secret = EphemeralSecret::random();
-    let alice_public = PublicKey::from(&alice_secret);
-    println!("Secret and public key pair generated.");
-
-    // Send Alice's public key to Bob
-    writer.write_all(alice_public.as_bytes()).await?;
-    writer.flush().await?;
-
-    // Receive Bob's public key
-    let mut buf: [u8; 32] = [0; 32];
-    match stream_reader.read_exact(&mut buf).await {
-        Ok(32) => {
-            println!("Friend's public key received: {:?}", hex::encode(buf));
-        },
-        _ => {
-            return Err(
-                anyhow!(
-                    "Incorrect number of bytes read for friend's public key. Aborting."
-                )
-            );
-        }
-    };
-    let bob_public = PublicKey::from(buf);
-
-    // Create the shared secret
-    let shared_secret = alice_secret.diffie_hellman(&bob_public);
-    println!("Shared secret's hash: {:x?}", sha256::digest(&shared_secret.to_bytes()));
+    // Exchange keys and get the shared secret
+    let shared_secret = key_exhange(&mut writer, &mut stream_reader).await?;
 
     // Start encrypted messaging
     messaging_loop(stream_reader, writer, shared_secret).await?;
@@ -65,38 +40,50 @@ pub async fn listen_for_connection(port: u16) -> Result<()> {
         let (reader, mut writer) = stream.into_split();
         let mut stream_reader = BufReader::new(reader);
 
-        // Generate keys for Bob
-        let bob_secret = EphemeralSecret::random();
-        let bob_public = PublicKey::from(&bob_secret);
-        println!("Secret and public key pair generated.");
-
-        // Send Bob's keys to Alice
-        writer.write_all(bob_public.as_bytes()).await?;
-        writer.flush().await?;
-
-        // Receive Alice's public key
-        let mut buf: [u8; 32] = [0; 32];
-        match stream_reader.read_exact(&mut buf).await {
-            Ok(32) => {
-                println!("Friend's public key received: {:?}", hex::encode(buf));
-            },
-            _ => {
-                return Err(
-                    anyhow!(
-                        "Incorrect number of bytes read for friend's public key. Aborting."
-                    )
-                );
-            }
-        };
-        let alice_public = PublicKey::from(buf);
-
-        // Create the shared secret
-        let shared_secret = bob_secret.diffie_hellman(&alice_public);
-        println!("Shared secret's hash: {:x?}", sha256::digest(&shared_secret.to_bytes()));
+        // Exchange keys and get the shared secret
+        let shared_secret = key_exhange(&mut writer, &mut stream_reader).await?;
 
         // Start encrypted messaging
         messaging_loop(stream_reader, writer, shared_secret).await?;
     }
 
     Ok(())
+}
+
+/// Generate a pair of private a public keys, exchange them with the other party, and
+/// generate a shared secret through Diffie-Hellman.
+async fn key_exhange(
+    writer: &mut OwnedWriteHalf,
+    stream_reader: &mut BufReader<OwnedReadHalf>
+) -> Result<SharedSecret> {
+    // Generate own keys
+    let own_secret = EphemeralSecret::random();
+    let own_public = PublicKey::from(&own_secret);
+    println!("Secret and public key pair generated.");
+
+    // Send own public key to friend
+    writer.write_all(own_public.as_bytes()).await?;
+    writer.flush().await?;
+    println!("Own public key sent to friend: {}", hex::encode(own_public.as_bytes()));
+
+    // Receive friend's public key
+    let mut buf: [u8; 32] = [0; 32];
+    match stream_reader.read_exact(&mut buf).await {
+        Ok(32) => {
+            println!("Friend's public key received: {}", hex::encode(buf));
+        },
+        _ => {
+            return Err(
+                anyhow!(
+                    "Incorrect number of bytes read for friend's public key. Aborting."
+                )
+            );
+        }
+    };
+    let friend_public = PublicKey::from(buf);
+
+    // Create the shared secret
+    let shared_secret = own_secret.diffie_hellman(&friend_public);
+    println!("Shared secret's hash: {}", sha256::digest(&shared_secret.to_bytes()));
+    Ok(shared_secret)
 }

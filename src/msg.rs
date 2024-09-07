@@ -6,7 +6,6 @@ use tokio::{io::AsyncReadExt, net::tcp::{OwnedReadHalf, OwnedWriteHalf}};
 use tokio::io::{self, BufReader, AsyncBufReadExt, AsyncWriteExt};
 use anyhow::{Result, anyhow};
 use x25519_dalek::SharedSecret;
-// use crate::crypto::{encrypt_with_nonce, decrypt_with_nonce};
 
 async fn parse_nonce(stream_reader: &mut BufReader<OwnedReadHalf>) -> Result<[u8; 12]> {
     let mut buf = [0u8; 12];
@@ -105,6 +104,8 @@ pub async fn messaging_loop(
 ) -> Result<()> {
     let key = Key::<Aes256Gcm>::from_slice(secret.as_bytes());
     let cipher = Aes256Gcm::new(&key);
+
+    println!("You can now chat securely!\n");
 
     tokio::try_join!(
         read_task(&cipher, stream_reader),
