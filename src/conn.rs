@@ -29,7 +29,7 @@ pub async fn setup_connection(address: Ipv6Addr, port: u16) -> Result<()> {
     let mut buf: [u8; 32] = [0; 32];
     match stream_reader.read_exact(&mut buf).await {
         Ok(32) => {
-            println!("Friend's public key received: {:x?}", buf);
+            println!("Friend's public key received: {:?}", hex::encode(buf));
         },
         _ => {
             return Err(
@@ -43,7 +43,7 @@ pub async fn setup_connection(address: Ipv6Addr, port: u16) -> Result<()> {
 
     // Create the shared secret
     let shared_secret = alice_secret.diffie_hellman(&bob_public);
-    println!("Shared secret: {:x?}", shared_secret.to_bytes());
+    println!("Shared secret's hash: {:x?}", sha256::digest(&shared_secret.to_bytes()));
 
     // Start encrypted messaging
     messaging_loop(stream_reader, writer, shared_secret).await?;
@@ -78,7 +78,7 @@ pub async fn listen_for_connection(port: u16) -> Result<()> {
         let mut buf: [u8; 32] = [0; 32];
         match stream_reader.read_exact(&mut buf).await {
             Ok(32) => {
-                println!("Friend's public key received: {:x?}", buf);
+                println!("Friend's public key received: {:?}", hex::encode(buf));
             },
             _ => {
                 return Err(
@@ -92,7 +92,7 @@ pub async fn listen_for_connection(port: u16) -> Result<()> {
 
         // Create the shared secret
         let shared_secret = bob_secret.diffie_hellman(&alice_public);
-        println!("Shared secret: {:x?}", shared_secret.to_bytes());
+        println!("Shared secret's hash: {:x?}", sha256::digest(&shared_secret.to_bytes()));
 
         // Start encrypted messaging
         messaging_loop(stream_reader, writer, shared_secret).await?;
