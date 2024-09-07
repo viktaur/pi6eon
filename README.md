@@ -4,7 +4,7 @@ Like a carrier pigeon over IPv6.
 ## Description
 Pi6eon is a minimal, direct, stateless, and end-to-end encrypted CLI app that enables direct chatting between two IPv6 address over TCP.
 
-Key exchange has been implemented using the [`x25519-dalek`](https://github.com/dalek-cryptography/curve25519-dalek) crate. The two parties generate a shared secret that is then used for symmetric message encryption using the [`aes-gcm`](https://github.com/RustCrypto/AEADs/tree/master/aes-gcm) crate. Please note that, although these two crates have been externally audited, there are no safety guarantees regarding their implementation in this project. **⚠️ USE AT YOUR OWN RISK ⚠️**.
+Key exchange has been implemented using the [`x25519-dalek`](https://github.com/dalek-cryptography/curve25519-dalek/tree/main/x25519-dalek) crate. The two parties generate a shared secret that is then used for symmetric message encryption using the [`aes-gcm`](https://github.com/RustCrypto/AEADs/tree/master/aes-gcm) crate. Please note that, although these two crates have been externally audited, there are no safety guarantees regarding their implementation in this project. **⚠️ USE AT YOUR OWN RISK ⚠️**.
 
 Finally, for communication to be possible, there needs to exist a network path free of any firewall or NAT restrictions between the two IPv6 addresses.
 
